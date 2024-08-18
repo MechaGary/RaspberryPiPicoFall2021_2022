@@ -1,0 +1,212 @@
+' {$STAMP BS2}
+' {$PBASIC 2.5}
+
+' 750 is a 1.3 ms pulse every 20 ms is zero speed    //
+' a value less than 650 make servo run clockwize full speed        //
+' a value less of 850 make servo run counterclockwize full speed       //
+' output 12 is right hand side servo, 13 is lefthand side
+
+
+
+' version 1 removes commented out debug lines to see if it is not so jerky
+
+'vars for PING'
+loops VAR Byte
+timecounts VAR Word
+time_msec VAR Word
+distance VAR Word
+distanceIN VAR Word
+loops = 1
+leftspd VAR Word
+rightspd VAR Word
+HardTurn VAR Bit
+
+'vars & declarations in subr SCAN for blackline'
+notZ PIN 4
+
+SEL0 PIN 1
+SEL1 PIN 2
+SEL2 PIN 3
+LED0 VAR Bit
+LED1 VAR Bit
+LED2 VAR Bit
+CenterLed VAR Bit
+LED4 VAR Bit
+LED5 VAR Bit
+LED6 VAR Bit
+SelOn CON 1
+SelOff CON 0
+
+' define IO to Arduino
+OUTPUT 5    ' trigger turning squeal tires
+OUTPUT 6    'trigger stop by lifting
+OUTPUT 7    ' trigger stop by roadblock
+
+' STARTUP BEEP '
+FOR loops = 1 TO 3
+FREQOUT 0, 100, 5000
+PAUSE 100
+NEXT
+loops = 1
+LOW 6
+
+'MAIN PROGRAM '
+DO
+loops = loops + 1
+IF loops = 20 THEN GOSUB PingFwd      'only ping once every 20 loops
+IF loops = 20 THEN loops = 1           'only ping once every 20 loops
+'DEBUG CR
+'DEBUG DEC3 loops, " = loop # "
+'DEBUG CR
+IF (distanceIN > 1) AND (distanceIN < 10) THEN GOSUB LITES
+
+GOSUB Scan_for_blackline
+
+rightspd = 650
+leftspd = 850
+
+IF LED2 = 0 AND LED1 = 1 THEN leftspd = 820  'zero = black line
+IF LED2 = 0 AND LED1 = 0 THEN leftspd = 790
+IF LED0 = 0 AND LED1 = 0 THEN leftspd = 750
+
+IF LED4 = 0 AND LED5 = 1 THEN rightspd = 680
+IF LED4 = 0 AND LED5 = 0 THEN rightspd = 710
+IF LED5 = 0 AND LED6 = 0 THEN rightspd = 750
+
+IF (LED0 = 1 OR LED1 = 1 OR LED5 = 1 OR LED6 = 1) THEN LOW 5   'zero = black line
+IF ((LED0 = 0 AND LED1 = 0) OR (LED5 = 0 AND LED6 = 0)) THEN HIGH 5   'zero = black line
+
+
+'IF ((LED2 = 0) AND (LED1 = 0) AND (LED4 = 0) AND (LED5 = 0)) THEN HIGH 6   'zero = black line
+'IF ((LED2 = 1) OR (LED1 = 1) OR (LED4 = 1) OR (LED5 = 1)) THEN LOW 6   'zero = black line
+IF LED2 = 0 AND LED1 = 0 AND LED4 = 0 AND LED5 = 0 THEN END
+
+PULSOUT 13 , leftspd  'leftwheel spd
+PULSOUT 12 , rightspd 'right wheel spd
+PAUSE 20
+
+LOOP
+
+
+     END
+
+'''''''''''''''''''''
+
+Scan_for_blackline: 'vars for SCAN for blackline'
+
+'check IN0 '
+LOW SEL0
+LOW SEL1
+LOW SEL2
+'PAUSE 10
+LED0 = notZ
+
+ 'check In1 '
+'SEL0 = SelOn
+'SEL1 = SelOff
+'SEL2 = SelOff
+HIGH SEL0
+LOW SEL1
+LOW SEL2
+'PAUSE 10
+LED1 = notZ
+
+'check In2 '
+SEL0 = SelOff
+SEL1 = SelOn
+SEL2 = SelOff
+'PAUSE 10
+LED2 = notZ
+
+'check In3 CenterLED'
+SEL0 = SelOn
+SEL1 = SelOn
+SEL2 = SelOff
+'PAUSE 10
+CenterLED = notZ
+
+'check In4 '
+SEL0 = SelOff
+SEL1 = SelOff
+SEL2 = SelOn
+'PAUSE 10
+LED4 = notZ
+
+'check In5 '
+SEL0 = SelOn
+SEL1 = SelOff
+SEL2 = SelOn
+'PAUSE 10
+LED5 = notZ
+
+'check In6 '
+SEL0 = SelOff
+SEL1 = SelOn
+SEL2 = SelOn
+'PAUSE 10
+LED6 = notZ
+
+RETURN
+
+''''''''''''''''''''''''''''''''''''
+
+PingFwd:
+  PULSOUT 8,5
+  PULSIN 9,1, timecounts
+'DEBUG CR
+'DEBUG DEC3 timecounts, " = timecounts  "
+'DEBUG CR
+  time_msec = timecounts / 50
+  distance = 343 * time_msec /10  '343 m/s is same as mm/ms '
+  distanceIN = 10 * distance /254 'inch = 25.4 mm '
+'DEBUG CR
+'DEBUG DEC3 distanceIN, " = distance inch in SUBR  "
+'DEBUG CR
+
+RETURN
+
+'''''''''''''''''''''''''
+
+LITES:
+' set outout to play ROADBLOCK SOUNDS on Arduino and WTV020
+HIGH 7
+
+DO
+HIGH 10
+PAUSE 300
+LOW 10
+PAUSE 200
+
+HIGH 10
+PAUSE 100
+LOW 10
+PAUSE 100
+HIGH 10
+PAUSE 70
+LOW 10
+PAUSE 70
+HIGH 10
+PAUSE 70
+LOW 10
+PAUSE 70
+HIGH 10
+PAUSE 70
+LOW 10
+PAUSE 70
+HIGH 10
+PAUSE 70
+LOW 10
+PAUSE 70
+HIGH 10
+PAUSE 70
+LOW 10
+
+GOSUB PingFwd
+PAUSE 50
+'DEBUG CR
+'DEBUG DEC3 distanceIN, " = distance inch in SUBR  "
+'DEBUG CR
+IF distanceIN=0 THEN distanceIN=20
+LOOP UNTIL (distanceIN>10)
+LOW 7 'turn off ROADBLOCK SOUNDS on Arduino and WTV020
+RETURN
